@@ -1,9 +1,12 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import httpStatus from "http-status";
 import mongoose from "mongoose";
 
 import QueryBuilder from "../../builder/QueryBuilder";
 import CustomAppError from "../../errors/CustomAppError";
+import ActivityLogService from "../activityLog/activityLog.service";
 import ProductModel from "../product/product.model";
+import RestockService from "../restock/restock.service";
 import { IOrder, OrderStatus } from "./order.interface";
 import OrderModel from "./order.model";
 
@@ -26,6 +29,13 @@ const createOrder = async (payload: Partial<IOrder>): Promise<IOrder> => {
   try {
     let totalAmount = 0;
 
+    // 0. Check for duplicate products in the same order
+    const productIds = items.map((item) => item.product.toString());
+    const uniqueProductIds = new Set(productIds);
+    if (uniqueProductIds.size !== productIds.length) {
+      throw new CustomAppError(httpStatus.BAD_REQUEST, "Duplicate products found in the order");
+    }
+
     // 1. Validate and Update Stock for each item
     for (const item of items) {
       const product = await ProductModel.findById(item.product).session(session);
@@ -35,7 +45,17 @@ const createOrder = async (payload: Partial<IOrder>): Promise<IOrder> => {
       }
 
       if (product.isDeleted) {
-        throw new CustomAppError(httpStatus.BAD_REQUEST, `Product is no longer available: ${product.name}`);
+        throw new CustomAppError(
+          httpStatus.BAD_REQUEST,
+          `Product is no longer available: ${product.name}`
+        );
+      }
+
+      if (product.status !== "active") {
+        throw new CustomAppError(
+          httpStatus.BAD_REQUEST,
+          `Product is currently unavailable: ${product.name}`
+        );
       }
 
       if (product.stockQuantity < item.quantity) {
@@ -47,7 +67,21 @@ const createOrder = async (payload: Partial<IOrder>): Promise<IOrder> => {
 
       // Reduce stock
       product.stockQuantity -= item.quantity;
+
+      // Update status to out-of-stock if 0
+      if (product.stockQuantity === 0) {
+        product.status = "out-of-stock";
+      }
+
       await product.save({ session });
+
+      // Trigger low-stock detection
+      await RestockService.handleLowStockDetection(
+        product._id.toString(),
+        product.stockQuantity,
+        product.minThreshold,
+        session
+      );
 
       // Calculate total (using unit price from payload or product - ideally product for security)
       // Here we use unit price from payload but we could also fetch from product
@@ -62,6 +96,12 @@ const createOrder = async (payload: Partial<IOrder>): Promise<IOrder> => {
     };
 
     const [newOrder] = await OrderModel.create([orderData], { session });
+
+    // 3. Log Activity
+    await ActivityLogService.createLog({
+      action: `Order #${newOrder._id} created`,
+      type: "order",
+    });
 
     await session.commitTransaction();
     session.endSession();
@@ -135,6 +175,12 @@ const updateOrderStatus = async (id: string, status: OrderStatus): Promise<IOrde
       { status },
       { new: true, runValidators: true, session }
     );
+
+    // Log Activity
+    await ActivityLogService.createLog({
+      action: `Order #${id} marked as ${status}`,
+      type: "order",
+    });
 
     await session.commitTransaction();
     session.endSession();

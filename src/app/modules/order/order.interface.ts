@@ -1,6 +1,6 @@
 import { Document, Types } from "mongoose";
 
-export type OrderStatus = "pending" | "shipped" | "delivered" | "cancelled";
+export type OrderStatus = "pending" | "confirmed" | "shipped" | "delivered" | "cancelled";
 
 /**
  * Order Item Interface
