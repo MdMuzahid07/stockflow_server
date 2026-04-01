@@ -4,20 +4,17 @@ import cors from "cors";
 import express, { Application, Request, Response } from "express";
 import mongoSanitize from "express-mongo-sanitize";
 import rateLimit from "express-rate-limit";
-import session from "express-session";
 import helmet from "helmet";
 import hpp from "hpp";
 import morgan from "morgan";
 
 import config from "./app/config";
-import passport from "./app/config/passport.config";
 import globalErrorHandler from "./app/middlewares/globalErrorHandler";
 import NotFound from "./app/middlewares/notFound";
 import { sanitizeInput } from "./app/middlewares/sanitizer";
 import router from "./app/routes";
 
 const app: Application = express();
-const normalizeOrigin = (origin: string) => origin.replace(/\/$/, "");
 
 // Trust proxy (important for rate limiting behind reverse proxy like Nginx)
 app.set("trust proxy", 1);
@@ -53,17 +50,7 @@ app.use(
   })
 ); // Set security HTTP headers
 
-// express-mongo-sanitize middleware reassigns req.query, which is incompatible with Express 5.
-// Use direct sanitization on mutable objects instead.
-app.use((req, _res, next) => {
-  if (req.body) {
-    mongoSanitize.sanitize(req.body);
-  }
-  if (req.params) {
-    mongoSanitize.sanitize(req.params);
-  }
-  next();
-}); // Data sanitization against NoSQL query injection
+app.use(mongoSanitize()); // Data sanitization against NoSQL query injection
 
 app.use(sanitizeInput); // Input sanitization
 
@@ -96,32 +83,25 @@ const apiLimiter = rateLimit({
 });
 
 // parsers
-app.use(express.json({ limit: "20mb" })); // Body limit
-app.use(express.urlencoded({ extended: true, limit: "20mb" }));
+app.use(express.json({ limit: "10kb" })); // Body limit
+app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 
-const allowedOrigins = (
+const allowedOrigins =
   config.NODE_ENV === "production"
-    ? ["https://stockflow-woad.vercel.app", config.frontend_url]
-    : ["http://localhost:3000", "http://localhost:3001", config.frontend_url]
-)
-  .filter(Boolean)
-  .map(normalizeOrigin);
+    ? ["https://stockflow-woad.vercel.app"]
+    : ["http://localhost:3000"];
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow all origins in development
-      if (config.NODE_ENV === "development") {
-        return callback(null, true);
-      }
-
-      if (!origin || allowedOrigins.includes(normalizeOrigin(origin))) {
+      if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
       }
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     maxAge: 86400,
   })
@@ -129,22 +109,6 @@ app.use(
 
 app.use(cookieParser());
 app.use(compression());
-
-// Session Middleware (Required for Google OAuth state parameter)
-app.use(
-  session({
-    secret: config.jwt_access_token_secret_key, // Using existing secret for simplicity
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: config.NODE_ENV === "production",
-      maxAge: 5 * 60 * 1000, // 5 minutes
-    },
-  })
-);
-
-// Passport Middleware
-app.use(passport.initialize());
 
 // Health Check (secured - don't expose uptime)
 app.get("/", (req: Request, res: Response) => {
