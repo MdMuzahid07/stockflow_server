@@ -3,51 +3,43 @@ import mongoose from "mongoose";
 
 import config from "../config";
 
-/**
- * Global is used here to maintain a cached connection across hot reloads
- * in development. This prevents connections growing exponentially
- * during API Route usage.
- */
-let cached = (global as any).mongoose;
+type ConnectionObject = {
+  isConnected?: number;
+};
 
-if (!cached) {
-  cached = (global as any).mongoose = { conn: null, promise: null };
-}
+const connection: ConnectionObject = {};
 
-async function connectDB(): Promise<typeof mongoose> {
-  if (cached.conn) {
-    console.log(chalk.green("Using existing MongoDB connection (cached)"));
-    return cached.conn;
+async function connectDB(): Promise<void> {
+  // Return if already connected
+  if (connection.isConnected === 1) {
+    console.log(chalk.green("Using existing MongoDB connection"));
+    return;
   }
 
-  if (!cached.promise) {
-    console.log(chalk.yellow("Creating new MongoDB connection..."));
-    const opts = {
-      serverSelectionTimeoutMS: 5000, // Fail fast in serverless
+  // Check mongoose connection state
+  if (mongoose.connection.readyState === 1) {
+    connection.isConnected = 1;
+    console.log(chalk.green("MongoDB already connected"));
+    return;
+  }
+
+  try {
+    const db = await mongoose.connect(config.database_url as string, {
+      serverSelectionTimeoutMS: 10000, // Increase to 10s
       socketTimeoutMS: 45000,
       connectTimeoutMS: 10000,
       retryWrites: true,
       retryReads: true,
       family: 4,
-      maxPoolSize: 10,
-      bufferCommands: false, // Turn off buffering to fail fast if disconnected!
-    };
-
-    cached.promise = mongoose.connect(config.database_url as string, opts).then((mongoose) => {
-      console.log(chalk.green("✅ MongoDB Connected Successfully"));
-      return mongoose;
+      maxPoolSize: 10, // Add connection pooling
     });
-  }
 
-  try {
-    cached.conn = await cached.promise;
-  } catch (e) {
-    cached.promise = null;
-    console.error(chalk.red("❌ MongoDB connection error:"), e);
-    throw e;
+    connection.isConnected = db.connections[0].readyState;
+    console.log(chalk.green("✅ MongoDB Connected Successfully"));
+  } catch (error) {
+    console.error(chalk.red("❌ MongoDB connection error:"), error);
+    throw error;
   }
-
-  return cached.conn;
 }
 
 export default connectDB;
