@@ -88,14 +88,18 @@ const apiLimiter = rateLimit({
 app.use(express.json({ limit: "20mb" })); // Body limit
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 
-const allowedOrigins =
-  config.NODE_ENV === "production"
+const allowedOrigins = config.NODE_ENV === "production"
     ? ["https://StockFlow.vercel.app", config.frontend_url]
-    : ["http://localhost:3000", config.frontend_url];
+    : ["http://localhost:3000", "http://localhost:3001", config.frontend_url];
 
 app.use(
   cors({
     origin: (origin, callback) => {
+      // Allow all origins in development
+      if (config.NODE_ENV === "development") {
+        return callback(null, true);
+      }
+      
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
