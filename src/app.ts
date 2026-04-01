@@ -17,6 +17,7 @@ import { sanitizeInput } from "./app/middlewares/sanitizer";
 import router from "./app/routes";
 
 const app: Application = express();
+const normalizeOrigin = (origin: string) => origin.replace(/\/$/, "");
 
 // Trust proxy (important for rate limiting behind reverse proxy like Nginx)
 app.set("trust proxy", 1);
@@ -98,10 +99,13 @@ const apiLimiter = rateLimit({
 app.use(express.json({ limit: "20mb" })); // Body limit
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 
-const allowedOrigins =
+const allowedOrigins = (
   config.NODE_ENV === "production"
     ? ["https://stockflow-woad.vercel.app", config.frontend_url]
-    : ["http://localhost:3000", "http://localhost:3001", config.frontend_url];
+    : ["http://localhost:3000", "http://localhost:3001", config.frontend_url]
+)
+  .filter(Boolean)
+  .map(normalizeOrigin);
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -110,14 +114,14 @@ app.use(
         return callback(null, true);
       }
 
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(normalizeOrigin(origin))) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
       }
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     maxAge: 86400,
   })
