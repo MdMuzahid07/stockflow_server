@@ -8,7 +8,7 @@ dotenv.config({ path: path.join(process.cwd(), ".env") });
 const envVarsSchema = z.object({
   DB_URL: z.string().url(),
   PORT: z.string().default("5000"),
-  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  NODE_ENV: z.enum(["development", "production"]),
   CLOUDINARY_API_KEY: z.string(),
   CLOUDINARY_API_SECRET: z.string(),
   CLOUDINARY_CLOUD_NAME: z.string(),
@@ -17,7 +17,7 @@ const envVarsSchema = z.object({
   JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
   BCRYPT_SALT_ROUND: z.coerce.number().default(12),
-  DATABASE_NAME: z.string().default("orbit-file-explorer"),
+  DATABASE_NAME: z.string().default("stockflow"),
   // Google OAuth
   GOOGLE_CLIENT_ID: z.string().trim().optional(),
   GOOGLE_CLIENT_SECRET: z.string().trim().optional(),

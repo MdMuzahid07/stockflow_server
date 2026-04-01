@@ -1,7 +1,7 @@
 import compression from "compression";
 import cookieParser from "cookie-parser";
 import cors from "cors";
-import express, { Application, Request, Response } from "express";
+import express, { Application, NextFunction, Request, Response } from "express";
 import mongoSanitize from "express-mongo-sanitize";
 import rateLimit from "express-rate-limit";
 import session from "express-session";
@@ -15,11 +15,22 @@ import globalErrorHandler from "./app/middlewares/globalErrorHandler";
 import NotFound from "./app/middlewares/notFound";
 import { sanitizeInput } from "./app/middlewares/sanitizer";
 import router from "./app/routes";
+import connectDB from "./app/utils/dbConnect";
 
 const app: Application = express();
 
 // Trust proxy (important for rate limiting behind reverse proxy like Nginx)
 app.set("trust proxy", 1);
+
+// Ensure Database is connected (Crucial for Vercel/serverless where server.ts is bypassed)
+app.use(async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 // Request logging (only in development)
 if (config.NODE_ENV === "development") {
@@ -33,24 +44,45 @@ if (config.NODE_ENV === "development") {
   );
 }
 
-// Security Middlewares
+// CORS Middleware (Placed at the top to ensure headers are sent for all requests, including errors)
+const allowedOrigins =
+  config.NODE_ENV === "production"
+    ? ["https://stockflow-woad.vercel.app", config.frontend_url]
+    : ["http://localhost:3000", "http://localhost:3001", config.frontend_url];
+
 app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        scriptSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", "https:", "blob:"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        connectSrc: ["'self'"],
-        frameSrc: ["'none'"],
-      },
+  cors({
+    origin: (origin, callback) => {
+      // Allow all origins in development
+      if (config.NODE_ENV === "development") {
+        return callback(null, true);
+      }
+
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
     },
-    crossOriginEmbedderPolicy: false,
-    crossOriginResourcePolicy: { policy: "cross-origin" },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    maxAge: 86400,
   })
-); // Set security HTTP headers
+);
+
+// Express 5 query descriptor workaround (to make req.query writable for mongoSanitize)
+app.use((req, res, next) => {
+  if (req.query) {
+    Object.defineProperty(req, "query", {
+      value: { ...req.query },
+      writable: true,
+      configurable: true,
+      enumerable: true,
+    });
+  }
+  next();
+});
 
 app.use(mongoSanitize()); // Data sanitization against NoSQL query injection
 
@@ -88,30 +120,23 @@ const apiLimiter = rateLimit({
 app.use(express.json({ limit: "20mb" })); // Body limit
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 
-const allowedOrigins = config.NODE_ENV === "production"
-    ? ["https://StockFlow.vercel.app", config.frontend_url]
-    : ["http://localhost:3000", "http://localhost:3001", config.frontend_url];
-
 app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow all origins in development
-      if (config.NODE_ENV === "development") {
-        return callback(null, true);
-      }
-      
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:", "blob:"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        connectSrc: ["'self'"],
+        frameSrc: ["'none'"],
+      },
     },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    maxAge: 86400,
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
   })
-);
+); // Set security HTTP headers
 
 app.use(cookieParser());
 app.use(compression());
