@@ -124,7 +124,9 @@ export const sanitizeInput = (req: Request, res: Response, next: NextFunction): 
 
   // Sanitize query parameters
   if (req.query) {
-    req.query = deepSanitize(req.query);
+    // Express 5 exposes req.query as a getter-only property.
+    // Mutate the existing object instead of reassigning the property.
+    Object.assign(req.query as Record<string, unknown>, deepSanitize(req.query));
   }
 
   // Sanitize URL parameters

@@ -52,7 +52,17 @@ app.use(
   })
 ); // Set security HTTP headers
 
-app.use(mongoSanitize()); // Data sanitization against NoSQL query injection
+// express-mongo-sanitize middleware reassigns req.query, which is incompatible with Express 5.
+// Use direct sanitization on mutable objects instead.
+app.use((req, _res, next) => {
+  if (req.body) {
+    mongoSanitize.sanitize(req.body);
+  }
+  if (req.params) {
+    mongoSanitize.sanitize(req.params);
+  }
+  next();
+}); // Data sanitization against NoSQL query injection
 
 app.use(sanitizeInput); // Input sanitization
 
