@@ -76,8 +76,7 @@
     "@types/express-serve-static-core": "4.17.33"
   },
   "engines": {
-    "node": ">=18.0.0",
-    "yarn": ">=1.22.0"
+    "node": ">=18.0.0"
   },
   "keywords": [
     "StockFlow_backend"
