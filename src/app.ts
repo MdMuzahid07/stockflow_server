@@ -7,6 +7,7 @@ import rateLimit from "express-rate-limit";
 import session from "express-session";
 import helmet from "helmet";
 import hpp from "hpp";
+import mongoose from "mongoose";
 import morgan from "morgan";
 
 import config from "./app/config";
@@ -14,6 +15,11 @@ import passport from "./app/config/passport.config";
 import globalErrorHandler from "./app/middlewares/globalErrorHandler";
 import NotFound from "./app/middlewares/notFound";
 import { sanitizeInput } from "./app/middlewares/sanitizer";
+
+// Disable buffering globally before any models are imported
+mongoose.set("bufferCommands", false);
+mongoose.set("strictQuery", true);
+
 import router from "./app/routes";
 import connectDB from "./app/utils/dbConnect";
 
