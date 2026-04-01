@@ -15,6 +15,7 @@ import { sanitizeInput } from "./app/middlewares/sanitizer";
 import router from "./app/routes";
 
 const app: Application = express();
+const normalizeOrigin = (origin: string) => origin.replace(/\/$/, "");
 
 // Trust proxy (important for rate limiting behind reverse proxy like Nginx)
 app.set("trust proxy", 1);
@@ -50,7 +51,16 @@ app.use(
   })
 ); // Set security HTTP headers
 
-app.use(mongoSanitize()); // Data sanitization against NoSQL query injection
+// express-mongo-sanitize reassigns req.query, which breaks on Express 5.
+app.use((req, _res, next) => {
+  if (req.body) {
+    mongoSanitize.sanitize(req.body);
+  }
+  if (req.params) {
+    mongoSanitize.sanitize(req.params);
+  }
+  next();
+}); // Data sanitization against NoSQL query injection
 
 app.use(sanitizeInput); // Input sanitization
 
@@ -86,22 +96,27 @@ const apiLimiter = rateLimit({
 app.use(express.json({ limit: "10kb" })); // Body limit
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 
-const allowedOrigins =
+const allowedOrigins = (
   config.NODE_ENV === "production"
-    ? ["https://stockflow-woad.vercel.app"]
-    : ["http://localhost:3000"];
+    ? ["https://stockflow-woad.vercel.app", config.frontend_url]
+    : ["http://localhost:3000", "http://localhost:3001", config.frontend_url]
+).filter((origin): origin is string => Boolean(origin));
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (config.NODE_ENV === "development") {
+        return callback(null, true);
+      }
+
+      if (!origin || allowedOrigins.map(normalizeOrigin).includes(normalizeOrigin(origin))) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
       }
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     maxAge: 86400,
   })

@@ -9,9 +9,9 @@ const envVarsSchema = z.object({
   DB_URL: z.string().url(),
   PORT: z.string().default("5000"),
   NODE_ENV: z.enum(["development", "production"]),
-  CLOUDINARY_API_KEY: z.string(),
-  CLOUDINARY_API_SECRET: z.string(),
-  CLOUDINARY_CLOUD_NAME: z.string(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
   JWT_ACCESS_SECRET_KEY: z.string(),
   JWT_REFRESH_SECRET_KEY: z.string(),
   JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
@@ -22,10 +22,10 @@ const envVarsSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().trim().optional(),
   GOOGLE_CLIENT_SECRET: z.string().trim().optional(),
   // Email Service (SMTP)
-  SMTP_HOST: z.string().min(1, "SMTP Host is required"),
+  SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.string().default("587"),
-  SMTP_USER: z.string().min(1, "SMTP User is required"),
-  SMTP_PASS: z.string().min(1, "SMTP Password is required"),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
   EMAIL_FROM: z.string().email().default("noreply@StockFlow.io"),
   EMAIL_FROM_NAME: z.string().default("Orbit Drive Support"),
   // URLs
@@ -36,7 +36,10 @@ const envVarsSchema = z.object({
 const envVars = envVarsSchema.safeParse(process.env);
 
 if (!envVars.success) {
-  throw new Error(`Config validation error: ${envVars.error.message}`);
+  const formattedErrors = envVars.error.issues
+    .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+    .join(", ");
+  throw new Error(`Config validation error: ${formattedErrors}`);
 }
 
 const { data } = envVars;
