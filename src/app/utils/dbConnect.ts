@@ -24,6 +24,9 @@ async function connectDB(): Promise<void> {
   }
 
   try {
+    // Fail fast in serverless instead of buffering model operations.
+    mongoose.set("bufferCommands", false);
+
     const db = await mongoose.connect(config.database_url as string, {
       serverSelectionTimeoutMS: 10000, // Increase to 10s
       socketTimeoutMS: 45000,
