@@ -1,4 +1,5 @@
-import { FilterQuery, Query } from "mongoose";
+import type { RootFilterQuery } from "mongoose";
+import { Query } from "mongoose";
 
 class QueryBuilder<T> {
   public modelQuery: Query<T[], T>;
@@ -17,7 +18,7 @@ class QueryBuilder<T> {
           (field) =>
             ({
               [field]: { $regex: searchTerm, $options: "i" },
-            }) as FilterQuery<T>,
+            }) as RootFilterQuery<T>
         ),
       });
     }
@@ -33,14 +34,13 @@ class QueryBuilder<T> {
 
     excludeFields.forEach((el) => delete queryObj[el]);
 
-    this.modelQuery = this.modelQuery.find(queryObj as FilterQuery<T>);
+    this.modelQuery = this.modelQuery.find(queryObj as RootFilterQuery<T>);
 
     return this;
   }
 
   sort() {
-    const sort =
-      (this?.query?.sort as string)?.split(",")?.join(" ") || "-createdAt";
+    const sort = (this?.query?.sort as string)?.split(",")?.join(" ") || "-createdAt";
     this.modelQuery = this.modelQuery.sort(sort as string);
 
     return this;
@@ -57,8 +57,7 @@ class QueryBuilder<T> {
   }
 
   fields() {
-    const fields =
-      (this?.query?.fields as string)?.split(",")?.join(" ") || "-__v";
+    const fields = (this?.query?.fields as string)?.split(",")?.join(" ") || "-__v";
 
     this.modelQuery = this.modelQuery.select(fields);
 

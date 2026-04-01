@@ -19,7 +19,10 @@ const userSchema = new Schema<IUser, IUserModel, IUserMethods>(
       unique: true,
       lowercase: true,
       trim: true,
-      match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, "Please provide a valid email address"],
+      match: [
+        /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
+        "Please provide a valid email address",
+      ],
     },
     password: {
       type: String,
@@ -49,15 +52,9 @@ userSchema.index({ email: 1 });
 userSchema.index({ isDeleted: 1 });
 
 // ===== Pre-save Middleware =====
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
-
-  try {
-    this.password = await bcrypt.hash(this.password, Number(config.bcrypt_salt_rounds));
-    next();
-  } catch (error) {
-    next(error as Error);
-  }
+userSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
+  this.password = await bcrypt.hash(this.password, Number(config.bcrypt_salt_rounds));
 });
 
 // ===== Instance Methods =====
@@ -81,9 +78,8 @@ userSchema.statics.isEmailTaken = async function (
 };
 
 // ===== Query Middleware =====
-userSchema.pre(/^find/, function (this: any, next) {
+userSchema.pre(/^find/, function (this: any) {
   this.find({ isDeleted: { $ne: true } });
-  next();
 });
 
 export default userSchema;

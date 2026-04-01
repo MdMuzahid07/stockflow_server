@@ -45,9 +45,9 @@ restockSchema.index({ status: 1, currentStock: 1 });
 restockSchema.index({ product: 1, status: 1 });
 
 // ===== Query Middleware =====
-restockSchema.pre(/^find/, function (this: any, next) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+restockSchema.pre(/^find/, function (this: any) {
   this.find({ isDeleted: { $ne: true } });
-  next();
 });
 
 export default restockSchema;

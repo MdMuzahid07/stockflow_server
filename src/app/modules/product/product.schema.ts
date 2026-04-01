@@ -60,21 +60,30 @@ productSchema.index({ status: 1 });
 productSchema.index({ isDeleted: 1 });
 
 // ===== Pre-save Middleware =====
-productSchema.pre("save", function (next) {
+productSchema.pre("save", function () {
   // Automatically update status based on stockQuantity
   if (this.stockQuantity === 0) {
     this.status = "out-of-stock";
   } else if (this.stockQuantity > 0 && this.status === "out-of-stock") {
     this.status = "active";
   }
-  next();
+});
+
+// ===== Pre-findOneAndUpdate Middleware =====
+productSchema.pre("findOneAndUpdate", function () {
+  const update = this.getUpdate() as any;
+
+  if (update?.stockQuantity === 0) {
+    update.status = "out-of-stock";
+  } else if (update?.stockQuantity > 0) {
+    update.status = "active";
+  }
 });
 
 // ===== Query Middleware =====
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-productSchema.pre(/^find/, function (this: any, next) {
+productSchema.pre(/^find/, function (this: any) {
   this.find({ isDeleted: { $ne: true } });
-  next();
 });
 
 export default productSchema;

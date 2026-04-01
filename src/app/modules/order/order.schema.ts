@@ -73,9 +73,8 @@ orderSchema.index({ createdAt: -1 });
 
 // ===== Query Middleware =====
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-orderSchema.pre(/^find/, function (this: any, next) {
+orderSchema.pre(/^find/, function (this: any) {
   this.find({ isDeleted: { $ne: true } });
-  next();
 });
 
 export default orderSchema;

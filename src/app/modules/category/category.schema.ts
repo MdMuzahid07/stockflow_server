@@ -42,9 +42,8 @@ categorySchema.statics.isCategoryNameTaken = async function (
 };
 
 // ===== Query Middleware =====
-categorySchema.pre(/^find/, function (this: any, next) {
+categorySchema.pre(/^find/, function (this: any) {
   this.find({ isDeleted: { $ne: true } });
-  next();
 });
 
 export default categorySchema;
