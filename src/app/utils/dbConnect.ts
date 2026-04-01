@@ -35,6 +35,7 @@ async function connectDB(): Promise<void> {
       retryReads: true,
       family: 4,
       maxPoolSize: 10, // Add connection pooling
+      dbName: config.database_name,
     });
 
     connection.isConnected = db.connections[0].readyState;

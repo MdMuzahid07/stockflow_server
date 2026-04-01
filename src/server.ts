@@ -66,6 +66,7 @@ async function main() {
       retryReads: true,
       compressors: ["zlib"],
       family: 4,
+      dbName: config.database_name,
     });
 
     console.log(chalk.green("🍃 MongoDB connected successfully"));
