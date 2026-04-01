@@ -1,4 +1,3 @@
-import chalk from "chalk";
 import mongoose from "mongoose";
 
 import config from "../config";
@@ -8,18 +7,22 @@ type ConnectionObject = {
 };
 
 const connection: ConnectionObject = {};
+const color = {
+  green: (message: string): string => `\x1b[32m${message}\x1b[0m`,
+  red: (message: string): string => `\x1b[31m${message}\x1b[0m`,
+};
 
 async function connectDB(): Promise<void> {
   // Return if already connected
   if (connection.isConnected === 1) {
-    console.log(chalk.green("Using existing MongoDB connection"));
+    console.log(color.green("Using existing MongoDB connection"));
     return;
   }
 
   // Check mongoose connection state
   if (mongoose.connection.readyState === 1) {
     connection.isConnected = 1;
-    console.log(chalk.green("MongoDB already connected"));
+    console.log(color.green("MongoDB already connected"));
     return;
   }
 
@@ -39,9 +42,9 @@ async function connectDB(): Promise<void> {
     });
 
     connection.isConnected = db.connections[0].readyState;
-    console.log(chalk.green("✅ MongoDB Connected Successfully"));
+    console.log(color.green("✅ MongoDB Connected Successfully"));
   } catch (error) {
-    console.error(chalk.red("❌ MongoDB connection error:"), error);
+    console.error(color.red("❌ MongoDB connection error:"), error);
     throw error;
   }
 }
